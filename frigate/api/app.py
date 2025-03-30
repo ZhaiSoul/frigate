@@ -80,12 +80,16 @@ def go2rtc_streams():
 
 
 @router.get("/go2rtc/streams/{camera_name}")
-def go2rtc_camera_stream(camera_name: str):
+def go2rtc_camera_stream(request: Request, camera_name: str):
     r = requests.get(
         f"http://127.0.0.1:1984/api/streams?src={camera_name}&video=all&audio=all&microphone"
     )
     if not r.ok:
-        logger.error("Failed to fetch streams from go2rtc")
+        camera_config = request.app.frigate_config.cameras.get(camera_name)
+
+        if camera_config and camera_config.enabled:
+            logger.error("Failed to fetch streams from go2rtc")
+
         return JSONResponse(
             content=({"success": False, "message": "Error fetching stream data"}),
             status_code=500,
@@ -634,6 +638,48 @@ def get_sub_labels(split_joined: Optional[int] = None):
 
     sub_labels.sort()
     return JSONResponse(content=sub_labels)
+
+
+@router.get("/plus/models")
+def plusModels(request: Request, filterByCurrentModelDetector: bool = False):
+    if not request.app.frigate_config.plus_api.is_active():
+        return JSONResponse(
+            content=({"success": False, "message": "Frigate+ is not enabled"}),
+            status_code=400,
+        )
+
+    models: dict[any, any] = request.app.frigate_config.plus_api.get_models()
+
+    if not models["list"]:
+        return JSONResponse(
+            content=({"success": False, "message": "No models found"}),
+            status_code=400,
+        )
+
+    modelList = models["list"]
+
+    # current model type
+    modelType = request.app.frigate_config.model.model_type
+
+    # current detectorType for comparing to supportedDetectors
+    detectorType = list(request.app.frigate_config.detectors.values())[0].type
+
+    validModels = []
+
+    for model in sorted(
+        filter(
+            lambda m: (
+                not filterByCurrentModelDetector
+                or (detectorType in m["supportedDetectors"] and modelType in m["type"])
+            ),
+            modelList,
+        ),
+        key=(lambda m: m["trainDate"]),
+        reverse=True,
+    ):
+        validModels.append(model)
+
+    return JSONResponse(content=validModels)
 
 
 @router.get("/recognized_license_plates")
