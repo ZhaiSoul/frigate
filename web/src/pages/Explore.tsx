@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import useSWR from "swr";
 import useSWRInfinite from "swr/infinite";
 import { useDocDomain } from "@/hooks/use-doc-domain";
+import { useDateLocale } from "@/hooks/use-date-locale";
 
 const API_LIMIT = 25;
 
@@ -31,6 +32,7 @@ export default function Explore() {
 
   const { t } = useTranslation(["views/explore"]);
   const { getLocaleDocUrl } = useDocDomain();
+  const locale = useDateLocale();
 
   const { data: config } = useSWR<FrigateConfig>("config", {
     revalidateOnFocus: false,
@@ -392,7 +394,10 @@ export default function Explore() {
                             )}
                       </div>
                       {reindexState.time_remaining >= 0 &&
-                        (formatSecondsToDuration(reindexState.time_remaining) ||
+                        (formatSecondsToDuration(
+                          reindexState.time_remaining,
+                          locale,
+                        ) ||
                           t(
                             "exploreIsUnavailable.embeddingsReindexing.finishingShortly",
                           ))}
